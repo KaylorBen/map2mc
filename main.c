@@ -95,22 +95,31 @@ int main(int argc, char *argv[]) {
     }
 
     i32 len_outdir_path = strlen(output_dir);
-    i32 len_region_dir_path = strlen(output_dir) + sizeof("region");
+    i32 len_region_dir_path = strlen(output_dir) + sizeof("region") + 1;
     i32 len_regions_path = strlen(output_dir) + 30; // some arbitrary big value
+    i32 len_data_path = strlen(output_dir) + sizeof("level.dat") + 1; // some arbitrary big value
 
     char region_dir[len_region_dir_path];
     snprintf(region_dir, len_region_dir_path, "%s/region", output_dir);
     mkdir(region_dir, 0755);
 
+    char data_path[len_data_path];
+    snprintf(data_path, len_data_path, "%s/level.dat", output_dir);
+    FILE *data_file = fopen(data_path, "w");
+    char level_data[2048];
+    i32 level_data_len = gen_level_data(level_data);
+    fwrite(level_data, 1, level_data_len, data_file);
+    fclose(data_file);
+
     load_height_map(input_file, img_buffer, &i_data);
 
     for (i32 x = -1; x < 1; x++) {
-        for (i32 y = -1; y < 1; y++) {
+        for (i32 z = -1; z < 1; z++) {
             char *region_file_buffer =
                 mmap(0, MEGABYTES(20), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-            i32 size = gen_region(region_file_buffer, &i_data, 0, 0);
+            i32 size = gen_region(region_file_buffer, &i_data, x, z);
             char region_file_path[len_regions_path];
-            snprintf(region_file_path, len_regions_path, "%s/region/r.%d.%d.mca", output_dir, x, y);
+            snprintf(region_file_path, len_regions_path, "%s/region/r.%d.%d.mca", output_dir, x, z);
             FILE *region_file = fopen(region_file_path, "w");
             fwrite(region_file_buffer, 1, size, region_file);
             fclose(region_file);

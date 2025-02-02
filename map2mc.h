@@ -45,7 +45,6 @@ enum : u8 {
 
 i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *data);
 i32 gen_region(char *region_file_buffer, image_data *image, i32 x, i32 z);
-
-#define GET_PIXEL(x, y, width, channels) (y * width + x) * channels
+i32 gen_level_data(char *level_data_dest);
 
 #endif  // !MAP2MC_H
