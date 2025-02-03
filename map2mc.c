@@ -277,7 +277,6 @@ static i32 write_chunk(char *chunk_buffer, image_data *image, i32 x, i32 z) {
     }
     write_count += write_nbt_long(&chunk_buffer[write_count], STR("LastUpdate"), 0);
     write_count += write_nbt_end(&chunk_buffer[write_count]);  // ""
-    if (verbose_flag == 1) printf("Wrote chunk (%d, %d)\n", x, z);
     return write_count;
 }
 
