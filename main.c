@@ -1,15 +1,15 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 
 #include "benlib.h"
 #include "map2mc.h"
-#include "libdeflate.h"
 
 int verbose_flag = 0;
+int water_level = 62;
 
 int main(int argc, char *argv[]) {
     int opt;
@@ -17,7 +17,6 @@ int main(int argc, char *argv[]) {
     char *input_file = NULL;
     char *output_dir = NULL;
     char *biome = NULL;
-    int water_height = 62;
     int num_threads = 8;
 
     // CLI parsing
@@ -37,8 +36,10 @@ int main(int argc, char *argv[]) {
                 break;
             case 'j':
                 num_threads = strtol(optarg, NULL, 10);
+                break;
             case 'w':
-                water_height = strtol(optarg, NULL, 10);
+                water_level = strtol(optarg, NULL, 10);
+                break;
             case 'h':
                 printf(
                     "Usage: %s [options] <input_file> <output_directory>\n\n"
@@ -84,10 +85,8 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    i32 width, height, channels;
     image_data i_data;
-    unsigned char *img_buffer =
-        mmap(0, GIGABYTES(32), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    unsigned char *img_buffer = mmap(0, GIGABYTES(32), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
     if (mkdir(output_dir, 0755) == -1) {
         fprintf(stderr, "Error: Could not create output directory.\n");
@@ -95,9 +94,9 @@ int main(int argc, char *argv[]) {
     }
 
     i32 len_outdir_path = strlen(output_dir);
-    i32 len_region_dir_path = strlen(output_dir) + sizeof("region") + 1;
-    i32 len_regions_path = strlen(output_dir) + 30; // some arbitrary big value
-    i32 len_data_path = strlen(output_dir) + sizeof("level.dat") + 1; // some arbitrary big value
+    i32 len_region_dir_path = len_outdir_path + sizeof("region") + 1;
+    i32 len_regions_path = len_outdir_path + 30;                    // some arbitrary big value
+    i32 len_data_path = len_outdir_path + sizeof("level.dat") + 1;  // some arbitrary big value
 
     char region_dir[len_region_dir_path];
     snprintf(region_dir, len_region_dir_path, "%s/region", output_dir);

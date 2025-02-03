@@ -7,7 +7,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-extern int verbose_flag;
+#define DIRT_MAX (16 * 16 * 16)
+
+extern int verbose_flag, water_level;
 
 i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *data) {
     buffer = stbi_load(filepath, &data->width, &data->height, &data->channels, 3);
@@ -176,40 +178,76 @@ static i32 write_nbt_list_double(char *buffer, double value) {
 static i32 write_section(char *section_buffer, image_data *image, i32 x, i32 z, i32 y) {
     i32 section_write_count = 0;
     section_write_count += write_nbt_compound(&section_buffer[section_write_count], STR("biomes"));
-    section_write_count +=
-        write_nbt_list(&section_buffer[section_write_count], STR("palette"), NBT_TAG_String, 1);
+    section_write_count += write_nbt_list(&section_buffer[section_write_count], STR("palette"), NBT_TAG_String, 1);
     // TODO for now biomes are static
-    section_write_count +=
-        write_nbt_list_str(&section_buffer[section_write_count], STR("minecraft:plains"));
+    section_write_count += write_nbt_list_str(&section_buffer[section_write_count], STR("minecraft:plains"));
     section_write_count += write_nbt_end(&section_buffer[section_write_count]);  // end biome
-    section_write_count +=
-        write_nbt_compound(&section_buffer[section_write_count], STR("block_states"));
-    section_write_count +=
-        write_nbt_list(&section_buffer[section_write_count], STR("palette"), NBT_TAG_Compound, 2);
-    section_write_count +=
-        write_nbt_string(&section_buffer[section_write_count], STR("Name"), STR("minecraft:air"));
-    section_write_count += write_nbt_end(&section_buffer[section_write_count]);
-    section_write_count +=
-        write_nbt_string(&section_buffer[section_write_count], STR("Name"), STR("minecraft:dirt"));
-    section_write_count += write_nbt_end(&section_buffer[section_write_count]);
+    section_write_count += write_nbt_compound(&section_buffer[section_write_count], STR("block_states"));
     i64 block_data[256];
-    coord chunkPos = {image->origin.x + (x * 16), image->origin.z + (z * 16)};
+    i64 sky_light[256];
+    i64 sky_light_set;
+    coord chunk_pos = {image->origin.x + (x * 16), image->origin.z + (z * 16)};
+    u64 block_count = 0;
     u64 block_set;
+    u32 greyscale_lvl, y_lvl;
     for (i32 yPos = 0; yPos < 16; yPos++) {
         for (i32 zPos = 0; zPos < 16; zPos++) {
             block_set = 0;
-            for (i32 xPos = 0; xPos < 16; xPos++) {
-                if (image->pixels[chunkPos.z * image->width + chunkPos.x].red > (y * 16) + yPos) {
-                    block_set += 1;
+            sky_light_set = 0;
+            for (i32 xPos = 15; xPos >= 0; xPos--) {
+                greyscale_lvl = image->pixels[(chunk_pos.z + zPos) * image->width + (chunk_pos.x + xPos)].red;
+                y_lvl = (y * 16) + yPos;
+                if (y_lvl <= greyscale_lvl) {
+                    block_set++;
+                    block_count++;
+                } else {
+                    if (y_lvl <= water_level) {
+                        block_set += 2;
+                        block_count += DIRT_MAX + 1;  // min value required so a chunk with any water is always larger
+                                                      // than a chunk of all dirt
+                    }
+                    sky_light_set += 0xF;
                 }
-                block_set <<= 4;
+                if (xPos != 0) {
+                    block_set <<= 4;
+                    sky_light_set <<= 4;
+                }
             }
             block_data[yPos * 16 + zPos] = block_set;
+            sky_light[yPos * 16 + zPos] = sky_light_set;
         }
     }
-    section_write_count += write_nbt_long_array(&section_buffer[section_write_count], STR("data"),
-                                                block_data, ARRAY_COUNT(block_data));
+    section_write_count += write_nbt_list(&section_buffer[section_write_count], STR("palette"), NBT_TAG_Compound,
+                                          (block_count != 0) + (block_count != DIRT_MAX) + (block_count > DIRT_MAX));
+    if (block_count > DIRT_MAX) {
+        section_write_count +=
+            write_nbt_string(&section_buffer[section_write_count], STR("Name"), STR("minecraft:air"));
+        section_write_count += write_nbt_end(&section_buffer[section_write_count]);
+        section_write_count +=
+            write_nbt_string(&section_buffer[section_write_count], STR("Name"), STR("minecraft:dirt"));
+        section_write_count += write_nbt_end(&section_buffer[section_write_count]);
+        section_write_count +=
+            write_nbt_string(&section_buffer[section_write_count], STR("Name"), STR("minecraft:water"));
+        section_write_count += write_nbt_end(&section_buffer[section_write_count]);
+    } else {
+        if (block_count != DIRT_MAX) {
+            section_write_count +=
+                write_nbt_string(&section_buffer[section_write_count], STR("Name"), STR("minecraft:air"));
+            section_write_count += write_nbt_end(&section_buffer[section_write_count]);
+        }
+        if (block_count != 0) {
+            section_write_count +=
+                write_nbt_string(&section_buffer[section_write_count], STR("Name"), STR("minecraft:dirt"));
+            section_write_count += write_nbt_end(&section_buffer[section_write_count]);
+        }
+    }
+    if (block_count != 0 && block_count != DIRT_MAX) {
+        section_write_count += write_nbt_long_array(&section_buffer[section_write_count], STR("data"), block_data,
+                                                    ARRAY_COUNT(block_data));
+    }
     section_write_count += write_nbt_end(&section_buffer[section_write_count]);  // block_states
+    section_write_count += write_nbt_byte_array(&section_buffer[section_write_count], STR("SkyLight"),
+                                                (char *)sky_light, sizeof(sky_light));
     section_write_count += write_nbt_byte(&section_buffer[section_write_count], STR("Y"), y);
     section_write_count += write_nbt_end(&section_buffer[section_write_count]);  // section
     return section_write_count;
@@ -233,8 +271,7 @@ static i32 write_chunk(char *chunk_buffer, image_data *image, i32 x, i32 z) {
     write_count += write_nbt_long(&chunk_buffer[write_count], STR("InhabitedTime"), 0);
     write_count += write_nbt_compound(&chunk_buffer[write_count], STR("Heightmaps"));
     write_count += write_nbt_end(&chunk_buffer[write_count]);  // "Heightmaps"
-    write_count +=
-        write_nbt_list(&chunk_buffer[write_count], STR("sections"), NBT_TAG_Compound, 24);
+    write_count += write_nbt_list(&chunk_buffer[write_count], STR("sections"), NBT_TAG_Compound, 24);
     for (i32 y = -4; y < 20; y++) {
         write_count += write_section(&chunk_buffer[write_count], image, x, z, y);
     }
@@ -259,8 +296,7 @@ typedef struct _timestamp {
 
 i32 gen_region(char *region_file_buffer, image_data *image, i32 x, i32 z) {
     struct libdeflate_compressor *compressor = libdeflate_alloc_compressor(1);
-    if (verbose_flag == 1)
-        printf("Generating Region: (%d, %d)\n", x, z);
+    if (verbose_flag == 1) printf("Generating Region: (%d, %d)\n", x, z);
     i32 chunk_size, big_e;
     i32 chunk_count = 0;
     i32 sector_counter = 2;
@@ -280,15 +316,16 @@ i32 gen_region(char *region_file_buffer, image_data *image, i32 x, i32 z) {
             chunk_x = x * 32 + i;
             chunk_z = z * 32 + j;
             chunk_size = write_chunk(chunk_buffer, image, chunk_x, chunk_z);
-            destLen = libdeflate_zlib_compress(compressor, (chunk_buffer), chunk_size, (region_file_buffer + file_pos + 5), MEGABYTES(1));
+            destLen = libdeflate_zlib_compress(compressor, (chunk_buffer), chunk_size,
+                                               (region_file_buffer + file_pos + 5), MEGABYTES(1));
             big_e = bswap_32((i32)destLen - 1);
             memcpy(region_file_buffer + file_pos, &big_e, sizeof(big_e));
             region_file_buffer[file_pos + sizeof(big_e)] = 0x02;  // compression type
             loc.offset = (bswap_32(sector_counter) >> 8);
             loc.sector_count = (destLen / 4096) + 1;
             sector_counter += loc.sector_count;
-            memcpy(&locations_header[4 * ((x & 31) + (z & 31) * 32)], &loc, sizeof(loc));
-            memcpy(&timestamps_header[4 * ((x & 31) + (z & 31) * 32)], &t, sizeof(t));
+            memcpy(&locations_header[4 * ((chunk_x & 31) + (chunk_z & 31) * 32)], &loc, sizeof(loc));
+            memcpy(&timestamps_header[4 * ((chunk_x & 31) + (chunk_z & 31) * 32)], &t, sizeof(t));
             chunk_count++;
         }
     }
@@ -308,29 +345,19 @@ i32 gen_level_data(char *level_data_dest) {
     data_size += write_nbt_compound(&level_data_buffer[data_size], STR("Data"));
     data_size += write_nbt_compound(&level_data_buffer[data_size], STR("Player"));
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnX"), 0);
-    data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnY"), 69);
+    data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnY"), 100);
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnZ"), 0);
     data_size += write_nbt_list(&level_data_buffer[data_size], STR("Pos"), NBT_TAG_Double, 3);
     data_size += write_nbt_list_double(&level_data_buffer[data_size], 0.5);
-    data_size += write_nbt_list_double(&level_data_buffer[data_size], 69);
+    data_size += write_nbt_list_double(&level_data_buffer[data_size], 100);
     data_size += write_nbt_list_double(&level_data_buffer[data_size], 0.5);
     data_size += write_nbt_byte(&level_data_buffer[data_size], STR("SpawnForced"), 1);
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // Player
-    data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnX"), 0);
-    data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnY"), 69);
-    data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnZ"), 0);
-    data_size += write_nbt_byte(&level_data_buffer[data_size], STR("hardcore"), 0);
-    data_size += write_nbt_byte(&level_data_buffer[data_size], STR("Difficulty"), 0);
-    data_size += write_nbt_long(&level_data_buffer[data_size], STR("BorderSizeLerpTime"), 0);
-    data_size += write_nbt_int(&level_data_buffer[data_size], STR("GameType"), 1);
-    data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderCenterX"), 0);
-    data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderCenterZ"), 0);
-    data_size += write_nbt_int(&level_data_buffer[data_size], STR("version"), 19133);
-    data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderSafeZone"), 5);
-    data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderWarningBlocks"), 5);
-    data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderDamagePerBlock"), 0.2);
-    data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderWarningTime"), 15);
-    data_size += write_nbt_long(&level_data_buffer[data_size], STR("LastPlayed"), 1000 * time(NULL));
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // Player
+    data_size += write_nbt_compound(&level_data_buffer[data_size], STR("Version"));
+    data_size += write_nbt_byte(&level_data_buffer[data_size], STR("Snapshot"), 0);
+    data_size += write_nbt_int(&level_data_buffer[data_size], STR("Id"), 3105);
+    data_size += write_nbt_string(&level_data_buffer[data_size], STR("Name"), STR("map2mc"));
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // Version
     data_size += write_nbt_compound(&level_data_buffer[data_size], STR("WorldGenSettings"));
     data_size += write_nbt_long(&level_data_buffer[data_size], STR("seed"), 27594263);
     data_size += write_nbt_byte(&level_data_buffer[data_size], STR("generate_features"), 0);
@@ -342,11 +369,11 @@ i32 gen_level_data(char *level_data_dest) {
     data_size += write_nbt_compound(&level_data_buffer[data_size], STR("biome_source"));
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("preset"), STR("minecraft:overworld"));
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("type"), STR("minecraft:multi_noise"));
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // biome_source
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // biome_source
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("type"), STR("minecraft:noise"));
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // generator
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // generator
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("type"), STR("minecraft:overworld"));
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // minecraft:overworld
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // minecraft:overworld
     data_size += write_nbt_compound(&level_data_buffer[data_size], STR("minecraft:the_nether"));
     data_size += write_nbt_compound(&level_data_buffer[data_size], STR("generator"));
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("settings"), STR("minecraft:nether"));
@@ -354,11 +381,11 @@ i32 gen_level_data(char *level_data_dest) {
     data_size += write_nbt_compound(&level_data_buffer[data_size], STR("biome_source"));
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("preset"), STR("minecraft:nether"));
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("type"), STR("minecraft:multi_noise"));
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // biome_source
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // biome_source
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("type"), STR("minecraft:noise"));
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // generator
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // generator
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("type"), STR("minecraft:the_nether"));
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // minecraft:the_nether
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // minecraft:the_nether
     data_size += write_nbt_compound(&level_data_buffer[data_size], STR("minecraft:the_end"));
     data_size += write_nbt_compound(&level_data_buffer[data_size], STR("generator"));
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("settings"), STR("minecraft:end"));
@@ -366,26 +393,36 @@ i32 gen_level_data(char *level_data_dest) {
     data_size += write_nbt_compound(&level_data_buffer[data_size], STR("biome_source"));
     data_size += write_nbt_long(&level_data_buffer[data_size], STR("seed"), 27594263);
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("type"), STR("minecraft:the_end"));
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // biome_source
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // biome_source
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("type"), STR("minecraft:noise"));
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // generator
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // generator
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("type"), STR("minecraft:the_end"));
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // minecraft:the_end
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // dimensions
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // WorldGenSettings
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // minecraft:the_end
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // dimensions
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // WorldGenSettings
+    data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnX"), 0);
+    data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnY"), 69);
+    data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnZ"), 0);
+    data_size += write_nbt_byte(&level_data_buffer[data_size], STR("hardcore"), 0);
+    data_size += write_nbt_byte(&level_data_buffer[data_size], STR("Difficulty"), 0);
+    data_size += write_nbt_long(&level_data_buffer[data_size], STR("BorderSizeLerpTime"), 0);
+    data_size += write_nbt_int(&level_data_buffer[data_size], STR("GameType"), 1);
+    data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderCenterX"), 0);
+    data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderCenterZ"), 0);
+    data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderSafeZone"), 5);
+    data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderWarningBlocks"), 5);
+    data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderDamagePerBlock"), 0.2);
+    data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderWarningTime"), 15);
     data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderSizeLerpTarget"), 60000000);
-    data_size += write_nbt_compound(&level_data_buffer[data_size], STR("Version"));
-    data_size += write_nbt_byte(&level_data_buffer[data_size], STR("Snapshot"), 0);
-    data_size += write_nbt_int(&level_data_buffer[data_size], STR("Id"), 3105);
-    data_size += write_nbt_string(&level_data_buffer[data_size], STR("Name"), STR("TestWorld"));
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // Version
-    data_size += write_nbt_string(&level_data_buffer[data_size], STR("LevelName"), STR("Generated World"));
     data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderSize"), 60000000);
+    data_size += write_nbt_int(&level_data_buffer[data_size], STR("version"), 19133);
+    data_size += write_nbt_long(&level_data_buffer[data_size], STR("LastPlayed"), 1000 * time(NULL));
+    data_size += write_nbt_string(&level_data_buffer[data_size], STR("LevelName"), STR("Test World"));
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("DataVersion"), 3105);
     data_size += write_nbt_byte(&level_data_buffer[data_size], STR("allowCommands"), 1);
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("MapHeight"), 320);
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // Data
-    data_size += write_nbt_end(&level_data_buffer[data_size]); // ""
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // Data
+    data_size += write_nbt_end(&level_data_buffer[data_size]);  // ""
     i32 compressed_size = libdeflate_gzip_compress(compressor, level_data_buffer, data_size, level_data_dest, 2048);
     libdeflate_free_compressor(compressor);
     return compressed_size;
