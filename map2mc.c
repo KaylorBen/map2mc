@@ -11,6 +11,7 @@
 
 extern int verbose_flag, water_level;
 
+#pragma pack(push, 1)
 typedef struct {
     u16 signature;
     u32 size;
@@ -21,11 +22,12 @@ typedef struct {
 
 typedef struct {
     u32 header_size;
-    u32 img_width;
-    u32 img_height;
+    u32 width;
+    u32 height;
     u16 color_planes;
     u16 bit_per_color;
 } DIB_header_useful;
+#pragma pack(pop)
 
 i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *data) {
     FILE *img = fopen(filepath, "rb");
@@ -47,16 +49,16 @@ i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *dat
 
     fread(&img_info, sizeof(DIB_header_useful), 1, img);
 
-    data->width = img_info.img_width;
-    data->height = img_info.img_height;
+    data->width = img_info.width;
+    data->height = img_info.height;
 
-    i32 rowSize = (img_info.img_width * img_info.bit_per_color);
+    i32 rowSize = (img_info.width);
     i32 padding = rowSize % 4;
 
     fseek(img, file_header.pixel_offset, SEEK_SET);
 
-    for (i32 i = 0; i < img_info.img_height; i++) {
-        fread(buffer + i * (rowSize + padding), 1, rowSize, img);
+    for (i32 i = 0; i < img_info.height; i++) {
+        fread(buffer + (img_info.height - i - 1) * (rowSize + padding), 1, rowSize, img);
         fseek(img, padding, SEEK_CUR);
     }
 
@@ -240,7 +242,7 @@ static i32 write_section(char *section_buffer, image_data *image, i32 x, i32 z, 
             block_set = 0;
             sky_light_set = 0;
             for (i32 xPos = 15; xPos >= 0; xPos--) {
-                greyscale_lvl = image->pixels[(chunk_pos.z + zPos) * image->width + (chunk_pos.x + xPos)].red;
+                greyscale_lvl = image->pixels[(chunk_pos.z + zPos) * image->width + (chunk_pos.x + xPos)];
                 y_lvl = (y * 16) + yPos;
                 if (y_lvl <= greyscale_lvl) {
                     block_set++;

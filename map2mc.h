@@ -3,27 +3,15 @@
 
 #include "benlib.h"
 
-typedef struct _pixel3 {  // for some reason heightmap is 3 channels, so doing this for now
-    u8 red;
-    u8 green;
-    u8 blue;
-} pixel3;
-
-typedef struct _thread_input_data {
-    pixel3 *imgStart;
-    i32 imgWidth;
-} thread_input_data;
-
 typedef struct _coord {
     i32 x;
     i32 z;
 } coord;
 
 typedef struct _image_data {
-    pixel3 *pixels;
+    unsigned char *pixels;
     i32 width;
     i32 height;
-    i32 channels;
     coord origin;
 } image_data;
 
