@@ -1,22 +1,67 @@
 #include "map2mc.h"
 
+#include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 #include "benlib.h"
 #include "libdeflate.h"
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
 
 #define DIRT_MAX (16 * 16 * 16)
 
 extern int verbose_flag, water_level;
 
+typedef struct {
+    u16 signature;
+    u32 size;
+    u16 reserved1;
+    u16 reserved2;
+    u32 pixel_offset;
+} BMP_file_header;
+
+typedef struct {
+    u32 header_size;
+    u32 img_width;
+    u32 img_height;
+    u16 color_planes;
+    u16 bit_per_color;
+} DIB_header_useful;
+
 i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *data) {
-    buffer = stbi_load(filepath, &data->width, &data->height, &data->channels, 3);
-    if (buffer == NULL) {
+    FILE *img = fopen(filepath, "rb");
+    if (!img) {
         printf("Error loading image %s\n", filepath);
-        return -1;
+        fclose(img);
+        exit(EXIT_FAILURE);
     }
+
+    BMP_file_header file_header;
+    DIB_header_useful img_info;
+
+    fread(&file_header, sizeof(BMP_file_header), 1, img);
+    if (file_header.signature != 0x4D42) {
+        printf("Invalid image format. BMP image required.\n");
+        fclose(img);
+        exit(EXIT_FAILURE);
+    }
+
+    fread(&img_info, sizeof(DIB_header_useful), 1, img);
+
+    data->width = img_info.img_width;
+    data->height = img_info.img_height;
+
+    i32 rowSize = (img_info.img_width * img_info.bit_per_color);
+    i32 padding = rowSize % 4;
+
+    fseek(img, file_header.pixel_offset, SEEK_SET);
+
+    for (i32 i = 0; i < img_info.img_height; i++) {
+        fread(buffer + i * (rowSize + padding), 1, rowSize, img);
+        fseek(img, padding, SEEK_CUR);
+    }
+
+    fclose(img);
+
     data->pixels = (void *)buffer;
     data->origin.x = data->width / 2;
     data->origin.z = data->height / 2;
