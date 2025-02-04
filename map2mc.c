@@ -30,6 +30,7 @@ typedef struct {
 #pragma pack(pop)
 
 i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *data) {
+
     FILE *img = fopen(filepath, "rb");
     if (!img) {
         printf("Error loading image %s\n", filepath);
@@ -252,8 +253,10 @@ static i32 write_section(char *section_buffer, image_data *image, i32 x, i32 z, 
                         block_set += 2;
                         block_count += DIRT_MAX + 1;  // min value required so a chunk with any water is always larger
                                                       // than a chunk of all dirt
+                        sky_light_set += 0xF - MIN((water_level - y_lvl), 0xF);
+                    } else {
+                        sky_light_set += 0xF;
                     }
-                    sky_light_set += 0xF;
                 }
                 if (xPos != 0) {
                     block_set <<= 4;
