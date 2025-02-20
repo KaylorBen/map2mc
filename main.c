@@ -25,15 +25,14 @@ typedef struct _worker_args {
 void *worker(void *arg) {
     worker_args *args = (worker_args *)arg;
 
+    char *region_file_buffer = mmap(0, MEGABYTES(20), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
     while (args) {
-        char *region_file_buffer = mmap(0, MEGABYTES(20), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
         i32 size = gen_region(region_file_buffer, args->i_data, args->x, args->z);
         char region_file_path[args->len_regions_path];
         snprintf(region_file_path, args->len_regions_path, "%s/region/r.%d.%d.mca", args->output_dir, args->x, args->z);
         FILE *region_file = fopen(region_file_path, "w");
         fwrite(region_file_buffer, 1, size, region_file);
         fclose(region_file);
-        munmap(region_file_buffer, MEGABYTES(20));
 
         args = args->next_task;
         if (verbose_flag) printf("Wrote region: (%d, %d) \n", args->x, args->z);

@@ -5,28 +5,38 @@
 #include <time.h>
 
 #include "benlib.h"
+#include "byteswap.h"
+#include "endian.h"
 #include "libdeflate.h"
 
 #define DIRT_MAX (16 * 16 * 16)
+
+#define ENDIAN_CORRECT_16(var, endianness) (endianness == LITTLE_ENDIAN) ? var : bswap_16(var)
+#define ENDIAN_CORRECT_64(var, endianness) (endianness == LITTLE_ENDIAN) ? var : bswap_64(var)
 
 extern int verbose_flag, water_level;
 
 #pragma pack(push, 1)
 typedef struct {
-    u16 signature;
-    u32 size;
-    u16 reserved1;
-    u16 reserved2;
-    u32 pixel_offset;
-} BMP_file_header;
+    u8 byte_order[2];  // Byte order ("II" or "MM")
+    u16 magic_number;  // Magic Number, should be 0x002B
+    u16 offset_size;   // Size of offset in bytes (0x0008)
+    u16 constant;      // should be 0x0000
+    u64 ifd_offset;    // offset to the first ifd
+} BigTIFF_file_header;
 
+// IFD Entry
 typedef struct {
-    u32 header_size;
-    u32 width;
-    u32 height;
-    u16 color_planes;
-    u16 bit_per_color;
-} DIB_header_useful;
+    u16 tag_id;  // The tag ID
+    u16 type;    // The type of the value
+    u64 count;   // The number of values
+    u64 value;   // Offset or value depending on the type
+} BigTIFF_ifd_entry;
+
+// TIFF IFD Header
+typedef struct {
+    u64 num_entries;  // Number of entires in the IFD
+} BigTIFF_ifd_header;
 #pragma pack(pop)
 
 i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *data) {
@@ -37,17 +47,51 @@ i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *dat
         exit(EXIT_FAILURE);
     }
 
-    BMP_file_header file_header;
-    DIB_header_useful img_info;
+    BigTIFF_file_header file_header;
+    fread(&file_header, sizeof(BigTIFF_file_header), 1, img);
 
-    fread(&file_header, sizeof(BMP_file_header), 1, img);
-    if (file_header.signature != 0x4D42) {
-        printf("Invalid image format. BMP image required.\n");
+    u32 endianness = 0;
+    if (strncmp((char *)file_header.byte_order, "II", 2) == 0) {
+        // Little Endian
+        endianness = LITTLE_ENDIAN;
+    } else if (strncmp((char *)file_header.byte_order, "MM", 2) == 0) {
+        // Big Endian
+        endianness = BIG_ENDIAN;
+    } else {
+        printf("Invalid TIFF byte order\n");
         fclose(img);
         exit(EXIT_FAILURE);
     }
 
-    fread(&img_info, sizeof(DIB_header_useful), 1, img);
+    u16 magic_number = ENDIAN_CORRECT_16(file_header.magic_number, endianness);
+    if (magic_number != 0x002B) {
+        printf("Invalid BigTIFF file (incorrect magic number)\n");
+        fclose(img);
+        exit(EXIT_FAILURE);
+    }
+
+    if (file_header.constant != 0x0000) {
+        printf("Invalid BigTIFF file (bytes 6-7 must be zero)\n");
+        fclose(img);
+        exit(EXIT_FAILURE);
+    }
+
+    u16 off_size = ENDIAN_CORRECT_16(file_header.offset_size, endianness);
+    if (magic_number != 0x0008) {
+        printf("Invalid BigTIFF file (invalid offset size)\n");
+        fclose(img);
+        exit(EXIT_FAILURE);
+    }
+
+    fseek(img, file_header.ifd_offset, SEEK_SET);
+    BigTIFF_ifd_header ifd_header;
+    fread(&ifd_header.num_entries, sizeof(u64), 1, img);
+
+    u64 num_entries = ENDIAN_CORRECT_64(ifd_header.num_entries, endianness);
+    BigTIFF_ifd_entry entries[num_entries];
+    fread(entries, sizeof(BigTIFF_ifd_entry), num_entries, img);
+
+    u32 width, height, bits_per_sample, compression, photometric;
 
     data->width = img_info.width;
     data->height = img_info.height;
@@ -67,6 +111,7 @@ i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *dat
     data->pixels = (void *)buffer;
     data->origin.x = data->width / 2;
     data->origin.z = data->height / 2;
+    exit(EXIT_SUCCESS);
     return 0;
 }
 
