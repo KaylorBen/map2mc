@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
     }
 
     image_data i_data;
-    unsigned char *img_buffer = mmap(0, GIGABYTES(32), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE , -1, 0);
+    unsigned char *img_buffer = mmap(0, GIGABYTES(32), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
     if (mkdir(output_dir, 0755) == -1) {
         fprintf(stderr, "Error: Could not create output directory.\n");
@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
     worker_args jobs[num_regions];
     struct timeval start_elapsed_time;
     gettimeofday(&start_elapsed_time, NULL);
-    for (i32 x = 0; x < region_width; x++) {
+    for (i32 x = 0; x < region_width; x++) {  // populate worker lists
         for (i32 z = 0; z < region_height; z++) {
             idx = x * region_height + z;
             jobs[idx].x = -(region_width / 2) + x;
@@ -181,8 +181,6 @@ int main(int argc, char *argv[]) {
                              (double)(end_elapsed_time.tv_usec - start_elapsed_time.tv_usec) / 1000000.0;
     printf("Successfully wrote %ld blocks in %lf seconds.", ((long)num_regions * 32 * 32 * 16 * 16 * (-64 + 320)),
            seconds_elapsed);
-
-    munmap(img_buffer, GIGABYTES(32));
 
     return EXIT_SUCCESS;
 }

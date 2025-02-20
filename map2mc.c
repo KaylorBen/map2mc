@@ -30,7 +30,6 @@ typedef struct {
 #pragma pack(pop)
 
 i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *data) {
-
     FILE *img = fopen(filepath, "rb");
     if (!img) {
         printf("Error loading image %s\n", filepath);
