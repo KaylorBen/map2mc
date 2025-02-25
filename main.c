@@ -1,3 +1,10 @@
+#ifdef build
+echo building map2mc
+libdeflate=$(nix build nixpkgs#libdeflate --no-link --print-out-paths)
+gcc *.c -o map2mc -lm -msse2 -L$libdeflate/lib/ -ldeflate -O3
+exit
+#endif // build
+
 #include <getopt.h>
 #include <pthread.h>
 #include <stdio.h>

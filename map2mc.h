@@ -4,14 +4,14 @@
 #include "benlib.h"
 
 typedef struct _coord {
-    i32 x;
-    i32 z;
+    i64 x;
+    i64 z;
 } coord;
 
 typedef struct _image_data {
     unsigned char *pixels;
-    i32 width;
-    i32 height;
+    i64 width;
+    i64 height;
     coord origin;
 } image_data;
 
