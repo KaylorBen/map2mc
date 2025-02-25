@@ -3,7 +3,7 @@ echo building map2mc
 libdeflate=$(nix build nixpkgs#libdeflate --no-link --print-out-paths)
 gcc *.c -o map2mc -lm -msse2 -L$libdeflate/lib/ -ldeflate -O3
 exit
-#endif // build
+#endif  // build
 
 #include <getopt.h>
 #include <pthread.h>
@@ -53,17 +53,17 @@ int main(int argc, char *argv[]) {
     char *input_file = NULL;
     char *output_dir = NULL;
     char *biome = NULL;
+    char *name = NULL;
     i32 num_threads = 8;
 
     // CLI parsing
-    static struct option long_options[] = {{"verbose", no_argument, NULL, 'v'},
-                                           {"help", no_argument, NULL, 'h'},
-                                           {"biome", required_argument, NULL, 'b'},
-                                           {"threads", required_argument, NULL, 't'},
-                                           {"water", required_argument, NULL, 'w'}};
+    static struct option long_options[] = {
+        {"verbose", no_argument, NULL, 'v'},     {"help", no_argument, NULL, 'h'},
+        {"biome", required_argument, NULL, 'b'}, {"threads", required_argument, NULL, 'j'},
+        {"water", required_argument, NULL, 'w'}, {"name", required_argument, NULL, 'n'}};
 
     int option_index;
-    while ((opt = getopt_long(argc, argv, "wvobht", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "w:v:o:b:h:j:n", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'v':
                 verbose_flag = 1;
@@ -71,11 +71,14 @@ int main(int argc, char *argv[]) {
             case 'b':
                 biome = optarg;
                 break;
-            case 't':
+            case 'j':
                 num_threads = atoi(optarg);
                 break;
             case 'w':
                 water_level = atoi(optarg);
+                break;
+            case 'n':
+                name = optarg;
                 break;
             case 'h':
                 printf(
@@ -87,7 +90,8 @@ int main(int argc, char *argv[]) {
                     "Options:\n"
                     "  -b, --biome <biome>     Specify the biome file to paint biome map)\n"
                     "  -h, --help              Show this help message and exit\n"
-                    "      --threads           Number of threads to use\n"
+                    "  -j, --threads           Number of threads to use\n"
+                    "  -n  --name              Minecraft World Name (defaults to output_directory)\n"
                     "  -v, --verbose           Enable verbose output\n"
                     "  -w, --water             Water height\n",
                     argv[0]);
@@ -122,6 +126,10 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    if (name == NULL) {
+        name = output_dir;
+    }
+
     image_data i_data;
     unsigned char *img_buffer = mmap(0, GIGABYTES(32), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
@@ -143,7 +151,7 @@ int main(int argc, char *argv[]) {
     snprintf(data_path, len_data_path, "%s/level.dat", output_dir);
     FILE *data_file = fopen(data_path, "w");
     char level_data[2048];
-    i32 level_data_len = gen_level_data(level_data);
+    i32 level_data_len = gen_level_data(level_data, name);
     fwrite(level_data, 1, level_data_len, data_file);
     fclose(data_file);
 

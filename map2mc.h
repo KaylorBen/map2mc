@@ -33,6 +33,6 @@ enum : u8 {
 
 i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *data);
 i32 gen_region(char *region_file_buffer, image_data *image, i32 x, i32 z);
-i32 gen_level_data(char *level_data_dest);
+i32 gen_level_data(char *level_data_dest, char *world_name);
 
 #endif  // !MAP2MC_H

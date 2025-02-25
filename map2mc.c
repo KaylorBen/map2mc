@@ -553,7 +553,7 @@ i32 gen_region(char *region_file_buffer, image_data *image, i32 x, i32 z) {
 //                       Level Data Gen
 // *****************************************************************
 
-i32 gen_level_data(char *level_data_dest) {
+i32 gen_level_data(char *level_data_dest, char *world_name) {
     char level_data_buffer[MEGABYTES(2)];
     struct libdeflate_compressor *compressor = libdeflate_alloc_compressor(1);
     i32 data_size = 0;
@@ -633,7 +633,7 @@ i32 gen_level_data(char *level_data_dest) {
     data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderSize"), 60000000);
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("version"), 19133);
     data_size += write_nbt_long(&level_data_buffer[data_size], STR("LastPlayed"), 1000 * time(NULL));
-    data_size += write_nbt_string(&level_data_buffer[data_size], STR("LevelName"), STR("Test World"));
+    data_size += write_nbt_string(&level_data_buffer[data_size], STR("LevelName"), STR(world_name));
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("DataVersion"), 3105);
     data_size += write_nbt_byte(&level_data_buffer[data_size], STR("allowCommands"), 1);
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("MapHeight"), 320);
