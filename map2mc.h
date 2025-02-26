@@ -9,7 +9,7 @@ typedef struct _coord {
 } coord;
 
 typedef struct _image_data {
-    unsigned char *pixels;
+    unsigned short *pixels;
     i64 width;
     i64 height;
     coord origin;

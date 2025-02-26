@@ -219,14 +219,14 @@ i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *dat
     u64 pos = 0;
     u64 off_type_size = (offset_type == SHORT) * 2 | (offset_type == LONG) * 4 | (offset_type == LONG8) * 8;
     u64 count_type_size = (count_type == SHORT) * 2 | (count_type == LONG) * 4 | (count_type == LONG8) * 8;
-    u64 off, count;
+    u64 off, byte_count;
     for (u64 i = 0; i < offset_count; i++) {
-        off = 0, count = 0;
+        off = 0, byte_count = 0;
         memcpy(&off, offsets + i * off_type_size, off_type_size);
-        memcpy(&count, counts + i * count_type_size, count_type_size);
+        memcpy(&byte_count, counts + i * count_type_size, count_type_size);
         fseek(img, off, SEEK_SET);
-        fread(buffer + pos, count, 1, img);
-        pos += count;
+        fread(buffer + pos, byte_count, i, img);
+        pos += byte_count;
     }
 
     fclose(img);
@@ -633,7 +633,7 @@ i32 gen_level_data(char *level_data_dest, char *world_name) {
     data_size += write_nbt_double(&level_data_buffer[data_size], STR("BorderSize"), 60000000);
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("version"), 19133);
     data_size += write_nbt_long(&level_data_buffer[data_size], STR("LastPlayed"), 1000 * time(NULL));
-    data_size += write_nbt_string(&level_data_buffer[data_size], STR("LevelName"), STR(world_name));
+    data_size += write_nbt_string(&level_data_buffer[data_size], STR("LevelName"), world_name, strlen(world_name));
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("DataVersion"), 3105);
     data_size += write_nbt_byte(&level_data_buffer[data_size], STR("allowCommands"), 1);
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("MapHeight"), 320);
