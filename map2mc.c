@@ -406,7 +406,7 @@ static i32 write_section(char *section_buffer, image_data *image, i32 x, i32 z, 
     coord chunk_pos = {image->origin.x + (x * 16), image->origin.z + (z * 16)};
     u64 block_count = 0;
     u64 block_set;
-    u32 greyscale_lvl, y_lvl;
+    i32 greyscale_lvl, y_lvl;
     for (i32 yPos = 0; yPos < 16; yPos++) {
         for (i32 zPos = 0; zPos < 16; zPos++) {
             block_set = 0;
@@ -491,8 +491,8 @@ static i32 write_chunk(char *chunk_buffer, image_data *image, i32 x, i32 z) {
     write_count += write_nbt_long(&chunk_buffer[write_count], STR("InhabitedTime"), 0);
     write_count += write_nbt_compound(&chunk_buffer[write_count], STR("Heightmaps"));
     write_count += write_nbt_end(&chunk_buffer[write_count]);  // "Heightmaps"
-    write_count += write_nbt_list(&chunk_buffer[write_count], STR("sections"), NBT_TAG_Compound, 69);
-    for (i32 y = -4; y < 64; y++) {
+    write_count += write_nbt_list(&chunk_buffer[write_count], STR("sections"), NBT_TAG_Compound, 132);
+    for (i32 y = -4; y < 128; y++) {
         write_count += write_section(&chunk_buffer[write_count], image, x, z, y);
     }
     write_count += write_nbt_long(&chunk_buffer[write_count], STR("LastUpdate"), 0);
@@ -639,7 +639,7 @@ i32 gen_level_data(char *level_data_dest, char *world_name) {
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("LevelName"), world_name, strlen(world_name));
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("DataVersion"), 3105);
     data_size += write_nbt_byte(&level_data_buffer[data_size], STR("allowCommands"), 1);
-    data_size += write_nbt_int(&level_data_buffer[data_size], STR("MapHeight"), 1024);
+    data_size += write_nbt_int(&level_data_buffer[data_size], STR("MapHeight"), 2048);
     data_size += write_nbt_end(&level_data_buffer[data_size]);  // Data
     data_size += write_nbt_end(&level_data_buffer[data_size]);  // ""
     i32 compressed_size = libdeflate_gzip_compress(compressor, level_data_buffer, data_size, level_data_dest, 2048);
