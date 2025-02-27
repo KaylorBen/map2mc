@@ -564,11 +564,11 @@ i32 gen_level_data(char *level_data_dest, char *world_name) {
     data_size += write_nbt_compound(&level_data_buffer[data_size], STR("Data"));
     data_size += write_nbt_compound(&level_data_buffer[data_size], STR("Player"));
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnX"), 0);
-    data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnY"), 100);
+    data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnY"), 200);
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("SpawnZ"), 0);
     data_size += write_nbt_list(&level_data_buffer[data_size], STR("Pos"), NBT_TAG_Double, 3);
     data_size += write_nbt_list_double(&level_data_buffer[data_size], 0.5);
-    data_size += write_nbt_list_double(&level_data_buffer[data_size], 100);
+    data_size += write_nbt_list_double(&level_data_buffer[data_size], 200);
     data_size += write_nbt_list_double(&level_data_buffer[data_size], 0.5);
     data_size += write_nbt_byte(&level_data_buffer[data_size], STR("SpawnForced"), 1);
     data_size += write_nbt_end(&level_data_buffer[data_size]);  // Player
