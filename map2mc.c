@@ -15,6 +15,8 @@
 #define ENDIAN_CORRECT_16(var, endianness) (endianness == LITTLE_ENDIAN) ? var : bswap_16(var)
 #define ENDIAN_CORRECT_64(var, endianness) (endianness == LITTLE_ENDIAN) ? var : bswap_64(var)
 
+#define IMG_TO_MINECRAFT_RATIO (1024.0 / (f64)U16_MAX)
+
 extern int verbose_flag, water_level;
 
 // *****************************************************************
@@ -89,8 +91,8 @@ static void *handle_entry(Arena *arena, image_data *data, BigTIFF_ifd_entry *ent
             data->height = entry->value;
             break;
         case BitsPerSample:
-            if (entry->value != 8) {
-                printf("Big TIFF image should be greyscale\n");
+            if (entry->value != 16) {
+                printf("Big TIFF image should be 16 bit greyscale\n");
                 // should close the image, but Im lazy and I like my nicer function call api
                 exit(EXIT_FAILURE);
             }
@@ -411,6 +413,7 @@ static i32 write_section(char *section_buffer, image_data *image, i32 x, i32 z, 
             sky_light_set = 0;
             for (i32 xPos = 15; xPos >= 0; xPos--) {
                 greyscale_lvl = image->pixels[(chunk_pos.z + zPos) * image->width + (chunk_pos.x + xPos)];
+                greyscale_lvl = (u32)((f64)greyscale_lvl * IMG_TO_MINECRAFT_RATIO);
                 y_lvl = (y * 16) + yPos;
                 if (y_lvl <= greyscale_lvl) {
                     block_set++;
@@ -489,7 +492,7 @@ static i32 write_chunk(char *chunk_buffer, image_data *image, i32 x, i32 z) {
     write_count += write_nbt_compound(&chunk_buffer[write_count], STR("Heightmaps"));
     write_count += write_nbt_end(&chunk_buffer[write_count]);  // "Heightmaps"
     write_count += write_nbt_list(&chunk_buffer[write_count], STR("sections"), NBT_TAG_Compound, 24);
-    for (i32 y = -4; y < 20; y++) {
+    for (i32 y = -4; y < 64; y++) {
         write_count += write_section(&chunk_buffer[write_count], image, x, z, y);
     }
     write_count += write_nbt_long(&chunk_buffer[write_count], STR("LastUpdate"), 0);
@@ -636,7 +639,7 @@ i32 gen_level_data(char *level_data_dest, char *world_name) {
     data_size += write_nbt_string(&level_data_buffer[data_size], STR("LevelName"), world_name, strlen(world_name));
     data_size += write_nbt_int(&level_data_buffer[data_size], STR("DataVersion"), 3105);
     data_size += write_nbt_byte(&level_data_buffer[data_size], STR("allowCommands"), 1);
-    data_size += write_nbt_int(&level_data_buffer[data_size], STR("MapHeight"), 320);
+    data_size += write_nbt_int(&level_data_buffer[data_size], STR("MapHeight"), 1024);
     data_size += write_nbt_end(&level_data_buffer[data_size]);  // Data
     data_size += write_nbt_end(&level_data_buffer[data_size]);  // ""
     i32 compressed_size = libdeflate_gzip_compress(compressor, level_data_buffer, data_size, level_data_dest, 2048);
