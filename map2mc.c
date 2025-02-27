@@ -15,7 +15,7 @@
 #define ENDIAN_CORRECT_16(var, endianness) (endianness == LITTLE_ENDIAN) ? var : bswap_16(var)
 #define ENDIAN_CORRECT_64(var, endianness) (endianness == LITTLE_ENDIAN) ? var : bswap_64(var)
 
-#define IMG_TO_MINECRAFT_RATIO (1024.0 / (f64)U16_MAX)
+#define IMG_TO_MINECRAFT_RATIO (1536.0 / (f64)U16_MAX)
 
 extern int verbose_flag, water_level;
 
