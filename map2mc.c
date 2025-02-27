@@ -491,7 +491,7 @@ static i32 write_chunk(char *chunk_buffer, image_data *image, i32 x, i32 z) {
     write_count += write_nbt_long(&chunk_buffer[write_count], STR("InhabitedTime"), 0);
     write_count += write_nbt_compound(&chunk_buffer[write_count], STR("Heightmaps"));
     write_count += write_nbt_end(&chunk_buffer[write_count]);  // "Heightmaps"
-    write_count += write_nbt_list(&chunk_buffer[write_count], STR("sections"), NBT_TAG_Compound, 24);
+    write_count += write_nbt_list(&chunk_buffer[write_count], STR("sections"), NBT_TAG_Compound, 69);
     for (i32 y = -4; y < 64; y++) {
         write_count += write_section(&chunk_buffer[write_count], image, x, z, y);
     }
