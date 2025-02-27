@@ -211,7 +211,6 @@ int main(int argc, char *argv[]) {
     struct stat st;
     stat("./datapack/map2mc.zip", &st);
     usize in_size = st.st_size;
-    printf("%zu\n", in_size);
     i32 in = open("./datapack/map2mc.zip", O_RDONLY);
     i32 out = open(datapack_path, O_WRONLY | O_CREAT);
     sendfile(out, in, 0, in_size);
