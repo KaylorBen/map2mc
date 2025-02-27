@@ -5,6 +5,12 @@ gcc *.c -o map2mc -lm -msse2 -L$libdeflate/lib/ -ldeflate -O3
 exit
 #endif  // build
 
+#define DATAPACKS "datapacks"
+#define DATAPACKS_SIZE sizeof(DATAPACKS)
+#define MAP2MC_ZIP "map2mc.zip"
+#define MAP2MC_ZIP_SIZE sizeof(MAP2MC_ZIP)
+
+#include <fcntl.h>
 #include <getopt.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -13,6 +19,7 @@ exit
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/sendfile.h>
 
 #include "benlib.h"
 #include "map2mc.h"
@@ -193,8 +200,22 @@ int main(int argc, char *argv[]) {
 
     double seconds_elapsed = (double)(end_elapsed_time.tv_sec - start_elapsed_time.tv_sec) +
                              (double)(end_elapsed_time.tv_usec - start_elapsed_time.tv_usec) / 1000000.0;
-    printf("Successfully wrote %ld blocks in %lf seconds.", ((long)num_regions * 32 * 32 * 16 * 16 * (-64 + 320)),
+    printf("Successfully wrote %ld blocks in %lf seconds.\n", ((long)num_regions * 32 * 32 * 16 * 16 * (-64 + 320)),
            seconds_elapsed);
+
+    u32 len_datapack_path = len_outdir_path  + strlen("/datapacks") + strlen("/map2mc.zip") + 1;
+    char datapack_path[len_datapack_path];
+    snprintf(datapack_path, len_datapack_path, "%s/datapacks", output_dir);
+    mkdir(datapack_path, 0755);
+    snprintf(datapack_path, len_datapack_path, "%s/datapacks/map2mc.zip", output_dir);
+    struct stat st;
+    stat("./datapack/map2mc.zip", &st);
+    usize in_size = st.st_size;
+    printf("%zu\n", in_size);
+    i32 in = open("./datapack/map2mc.zip", O_RDONLY);
+    i32 out = open(datapack_path, O_WRONLY | O_CREAT);
+    sendfile(out, in, 0, in_size);
+    chmod(datapack_path, 0644);
 
     return EXIT_SUCCESS;
 }
