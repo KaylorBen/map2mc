@@ -2,18 +2,7 @@
 #define MAP2MC_H
 
 #include "benlib.h"
-
-typedef struct _coord {
-    i64 x;
-    i64 z;
-} coord;
-
-typedef struct _image_data {
-    unsigned short *pixels;
-    i64 width;
-    i64 height;
-    coord origin;
-} image_data;
+#include "bigtiff.h"
 
 enum : u8 {
     NBT_TAG_End,
@@ -31,7 +20,6 @@ enum : u8 {
     NBT_TAG_Long_Array,
 };
 
-i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *data);
 i32 gen_region(char *region_file_buffer, image_data *image, i32 x, i32 z);
 i32 gen_level_data(char *level_data_dest, char *world_name);
 
