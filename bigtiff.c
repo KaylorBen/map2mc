@@ -1,5 +1,6 @@
 #include "bigtiff.h"
 
+#include <pthread.h>
 #include <string.h>
 
 #include "endian.h"
@@ -67,6 +68,27 @@ typedef struct {
     u64 num_entries;  // Number of entires in the IFD
 } BigTIFF_ifd_header;
 #pragma pack(pop)
+
+typedef struct {
+    const char *filepath;
+    u8 *buffer;
+    u64 buffer_pos;
+    u64 offset;
+    u64 byte_count;
+} StripReadJob;
+
+void *read_strip_thread(void *arg) {
+    StripReadJob *job = (StripReadJob *)arg;
+    FILE *f = fopen(job->filepath, "rb");
+    if (!f) {
+        fprintf(stderr, "Thread failed to open file for strip read\n");
+        pthread_exit(NULL);
+    }
+    fseek(f, job->offset, SEEK_SET);
+    fread(job->buffer + job->buffer_pos, job->byte_count, 1, f);
+    fclose(f);
+    return NULL;
+}
 
 static void *handle_entry(Arena *arena, image_data *data, BigTIFF_ifd_entry *entry, FILE *img) {
     void *mem;
@@ -206,17 +228,32 @@ i32 load_height_map(const char *filepath, unsigned char *buffer, image_data *dat
         }
     }
 
-    u64 pos = 0;
     u64 off_type_size = (offset_type == SHORT) * 2 | (offset_type == LONG) * 4 | (offset_type == LONG8) * 8;
     u64 count_type_size = (count_type == SHORT) * 2 | (count_type == LONG) * 4 | (count_type == LONG8) * 8;
-    u64 off, byte_count;
+
+    StripReadJob jobs[offset_count];
+    pthread_t threads[offset_count];
+    u64 pos = 0;
+
     for (u64 i = 0; i < offset_count; i++) {
-        off = 0, byte_count = 0;
+        u64 off = 0, byte_count = 0;
         memcpy(&off, offsets + i * off_type_size, off_type_size);
         memcpy(&byte_count, counts + i * count_type_size, count_type_size);
-        fseek(img, off, SEEK_SET);
-        fread(buffer + pos, byte_count, i, img);
+
+        jobs[i] = (StripReadJob){
+            .filepath = filepath,
+            .buffer = buffer,
+            .buffer_pos = pos,
+            .offset = off,
+            .byte_count = byte_count,
+        };
+
+        pthread_create(&threads[i], NULL, read_strip_thread, &jobs[i]);
         pos += byte_count;
+    }
+
+    for (u64 i = 0; i < offset_count; i++) {
+        pthread_join(threads[i], NULL);
     }
 
     fclose(img);

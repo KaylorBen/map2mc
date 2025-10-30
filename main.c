@@ -1,7 +1,8 @@
 #ifdef build
 echo building map2mc
 libdeflate=$(nix build nixpkgs#libdeflate --no-link --print-out-paths)
-gcc *.c -o map2mc -lm -msse2 -L$libdeflate/lib/ -ldeflate -O3
+cc=$(nix build nixpkgs#gcc.out --no-link --print-out-paths)/bin/gcc
+$cc *.c -o map2mc -lm -msse2 -L$libdeflate/lib/ -ldeflate -O3
 exit
 #endif  // build
 
@@ -176,7 +177,7 @@ int main(int argc, char *argv[]) {
     for (i32 x = 0; x < region_width; x++) {  // populate worker lists
         for (i32 z = 0; z < region_height; z++) {
             idx = x * region_height + z;
-            jobs[idx].x = -(region_width / 2) + x;
+            jobs[idx].x = -(region_width / 2) + x - 100; // - 100
             jobs[idx].z = -(region_height / 2) + z;
             jobs[idx].i_data = &i_data;
             jobs[idx].output_dir = output_dir;
@@ -200,7 +201,7 @@ int main(int argc, char *argv[]) {
 
     double seconds_elapsed = (double)(end_elapsed_time.tv_sec - start_elapsed_time.tv_sec) +
                              (double)(end_elapsed_time.tv_usec - start_elapsed_time.tv_usec) / 1000000.0;
-    printf("Successfully wrote %ld blocks in %lf seconds.\n", ((long)num_regions * 32 * 32 * 16 * 16 * (-64 + 320)),
+    printf("Successfully wrote %ld blocks in %lf seconds.\n", ((long)num_regions * 32 * 32 * 16 * 16 * (2096)),
            seconds_elapsed);
 
     u32 len_datapack_path = len_outdir_path  + strlen("/datapacks") + strlen("/map2mc.zip") + 1;
